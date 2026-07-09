@@ -68,11 +68,11 @@ inline void reduce_fp16_buffers(int start_elements, int num_elements, char* to_b
   // process remaining part
   int i = (start_elements + main_elements) * element_size;
   while (remain_elements > 0) {
-    float16_t val = 0.0f;
+    float val = 0.0f;
     for (int j = 0; j < world_size; j++) {
-      val = vaddh_f16(val, *(float16_t*)(buffers[j] + i));
+      val += static_cast<float>(*(float16_t*)(buffers[j] + i));
     }
-    *(float16_t*)(to_buffer + i) = val;
+    *(float16_t*)(to_buffer + i) = static_cast<float16_t>(val);
     remain_elements--;
     i += element_size;
   }

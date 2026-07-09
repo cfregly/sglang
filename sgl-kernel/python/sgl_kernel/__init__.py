@@ -1,11 +1,16 @@
 import platform
+import os
 import sys
 
 from sgl_kernel.version import __version__  # noqa: F401
 
-# On macOS only the Metal extension is shipped; skip CUDA op loading and
-# re-exports so those symbols are not exposed on Apple Silicon.
-if sys.platform == "darwin" and platform.machine() == "arm64":
+# On macOS the default Apple Silicon package is Metal-only. CPU test and
+# server runs can opt into the CPU common_ops extension with SGLANG_USE_CPU_ENGINE.
+if (
+    sys.platform == "darwin"
+    and platform.machine() == "arm64"
+    and os.getenv("SGLANG_USE_CPU_ENGINE") != "1"
+):
     from sgl_kernel.metal import *
 else:
     import torch

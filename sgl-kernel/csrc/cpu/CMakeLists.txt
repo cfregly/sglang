@@ -18,6 +18,36 @@ message(STATUS ${TORCH_PY_PREFIX})
 list(APPEND CMAKE_PREFIX_PATH ${TORCH_PY_PREFIX}/Torch)
 find_package(Torch REQUIRED)
 
+foreach(TORCH_LIB_NAME c10 torch torch_cpu)
+    find_library(SGLANG_CPU_${TORCH_LIB_NAME}_LIBRARY
+        NAMES ${TORCH_LIB_NAME}
+        PATHS "${TORCH_INSTALL_PREFIX}/lib"
+        NO_DEFAULT_PATH
+        REQUIRED)
+    list(APPEND SGLANG_CPU_TORCH_LIBRARIES ${SGLANG_CPU_${TORCH_LIB_NAME}_LIBRARY})
+endforeach()
+
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    find_library(SGLANG_CPU_TORCH_OPENMP_LIBRARY
+        NAMES omp libomp
+        PATHS "${TORCH_INSTALL_PREFIX}/lib"
+        NO_DEFAULT_PATH)
+    find_path(LIBOMP_INCLUDE_DIR omp.h
+        HINTS /opt/homebrew/opt/libomp/include /usr/local/opt/libomp/include)
+    find_library(LIBOMP_LIBRARY omp
+        HINTS /opt/homebrew/opt/libomp/lib /usr/local/opt/libomp/lib)
+    if(LIBOMP_INCLUDE_DIR AND (SGLANG_CPU_TORCH_OPENMP_LIBRARY OR LIBOMP_LIBRARY))
+        set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp")
+        set(OpenMP_CXX_LIB_NAMES "omp")
+        if(SGLANG_CPU_TORCH_OPENMP_LIBRARY)
+            set(OpenMP_omp_LIBRARY "${SGLANG_CPU_TORCH_OPENMP_LIBRARY}")
+        else()
+            set(OpenMP_omp_LIBRARY "${LIBOMP_LIBRARY}")
+        endif()
+    endif()
+endif()
+find_package(OpenMP REQUIRED COMPONENTS CXX)
+
 include_directories(
     ${TORCH_INCLUDE_DIRS}
     ${TORCH_INSTALL_PREFIX}/include
@@ -54,37 +84,48 @@ if(MY_ARCH_DIR)
     list(APPEND SOURCES ${ARCH_SOURCES})
 endif()
 
-# Conda library path support
-if(DEFINED ENV{CONDA_PREFIX})
-    set(CONDA_LIB_DIR "$ENV{CONDA_PREFIX}/lib")
-    message(STATUS "Using Conda lib dir: ${CONDA_LIB_DIR}")
-    link_directories(${CONDA_LIB_DIR})
-    set(CONDA_INCLUDE_DIR "$ENV{CONDA_PREFIX}/include")
-    include_directories(${CONDA_INCLUDE_DIR})
+# NUMA affinity is Linux-specific. Keep Linux builds strict, but allow
+# non-Linux CPU wheels to build with a no-affinity fallback implementation.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(DEFINED ENV{CONDA_PREFIX})
+        set(CONDA_LIB_DIR "$ENV{CONDA_PREFIX}/lib")
+        message(STATUS "Using Conda lib dir: ${CONDA_LIB_DIR}")
+        link_directories(${CONDA_LIB_DIR})
+        set(CONDA_INCLUDE_DIR "$ENV{CONDA_PREFIX}/include")
+        include_directories(${CONDA_INCLUDE_DIR})
 
-    # Look for libnuma in Conda's lib directory
-    find_library(NUMA_LIB numa HINTS "${CONDA_LIB_DIR}")
-    if(NUMA_LIB)
-        message(STATUS "Found libnuma: ${NUMA_LIB}")
+        find_library(NUMA_LIB numa HINTS "${CONDA_LIB_DIR}")
+        if(NUMA_LIB)
+            message(STATUS "Found libnuma: ${NUMA_LIB}")
+        else()
+            message(FATAL_ERROR "libnuma not found in Conda environment at ${CONDA_LIB_DIR}\n"
+                                "Please install it using: conda install libnuma numactl\n")
+        endif()
     else()
-        message(FATAL_ERROR "libnuma not found in Conda environment at ${CONDA_LIB_DIR}\n"
-                            "Please install it using: conda install libnuma numactl\n")
+        if(DEFINED ENV{VIRTUAL_ENV})
+            set(VENV_LIB_DIR "$ENV{VIRTUAL_ENV}/lib")
+            message(STATUS "Using venv lib dir: ${VENV_LIB_DIR}")
+            link_directories(${VENV_LIB_DIR})
+            set(VENV_INCLUDE_DIR "$ENV{VIRTUAL_ENV}/include")
+            include_directories(${VENV_INCLUDE_DIR})
+        endif()
+        find_library(NUMA_LIB numa)
+        if(NUMA_LIB)
+            message(STATUS "Found libnuma: ${NUMA_LIB}")
+        else()
+            message(FATAL_ERROR "libnuma not found in system environment\n"
+                                "Please install it using: apt-get install libnuma numactl\n")
+        endif()
     endif()
 else()
+    list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/numa_utils.cpp)
+    add_compile_definitions(SGLANG_CPU_NO_NUMA)
     if(DEFINED ENV{VIRTUAL_ENV})
         set(VENV_LIB_DIR "$ENV{VIRTUAL_ENV}/lib")
         message(STATUS "Using venv lib dir: ${VENV_LIB_DIR}")
         link_directories(${VENV_LIB_DIR})
         set(VENV_INCLUDE_DIR "$ENV{VIRTUAL_ENV}/include")
         include_directories(${VENV_INCLUDE_DIR})
-    endif()
-    # Look for libnuma in system env paths
-    find_library(NUMA_LIB numa)
-    if(NUMA_LIB)
-        message(STATUS "Found libnuma: ${NUMA_LIB}")
-    else()
-        message(FATAL_ERROR "libnuma not found in system environment\n"
-                            "Please install it using: apt-get install libnuma numactl\n")
     endif()
 endif()
 
@@ -126,20 +167,24 @@ if(MY_ARCH_DIR STREQUAL "x86_64")
         -mamx-tile
         -mamx-bf16
         -mamx-int8
-        -fopenmp
     )
 else()
     add_compile_options(
         -O3
         -Wno-unknown-pragmas
         -march=native
-        -fopenmp
     )
 endif()
 
 Python_add_library(common_ops MODULE USE_SABI ${SKBUILD_SABI_VERSION} WITH_SOABI ${SOURCES})
-target_link_libraries(common_ops PRIVATE ${TORCH_LIBRARIES} ${NUMA_LIB})
+target_link_libraries(common_ops PRIVATE ${SGLANG_CPU_TORCH_LIBRARIES} OpenMP::OpenMP_CXX)
+if(NUMA_LIB)
+    target_link_libraries(common_ops PRIVATE ${NUMA_LIB})
+endif()
 target_include_directories(common_ops PRIVATE ${TORCH_INCLUDE_DIRS})
+if(LIBOMP_INCLUDE_DIR)
+    target_include_directories(common_ops PRIVATE ${LIBOMP_INCLUDE_DIR})
+endif()
 
 install(TARGETS common_ops
     LIBRARY DESTINATION sgl_kernel

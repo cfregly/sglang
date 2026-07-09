@@ -17,6 +17,15 @@ limitations under the License.
 #include <torch/all.h>
 #include <torch/library.h>
 
+#include <algorithm>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
+
 #include "sgl_kernel_ops.h"
 #include "shm.h"
 
@@ -464,7 +473,30 @@ std::tuple<at::Tensor, at::Tensor> multimodal_rotary_embedding_cpu(
     bool is_neox);
 
 // CPU and memory binding
+#ifdef SGLANG_CPU_NO_NUMA
+std::string init_cpu_threads_env(const std::string& cpu_ids) {
+  int requested_threads = 0;
+  std::stringstream cpu_stream(cpu_ids);
+  std::string item;
+  while (std::getline(cpu_stream, item, ',')) {
+    if (!item.empty()) {
+      ++requested_threads;
+    }
+  }
+  requested_threads = std::max(requested_threads, 1);
+  at::set_num_threads(requested_threads);
+#if defined(_OPENMP)
+  omp_set_num_threads(requested_threads);
+#endif
+
+  std::stringstream ss;
+  ss << "CPU thread affinity is not supported on this platform; configured " << requested_threads
+     << " CPU worker thread(s).\n";
+  return ss.str();
+}
+#else
 std::string init_cpu_threads_env(const std::string& cpu_ids);
+#endif
 
 // fused_sigmoid_gating_delta_rule_update
 at::Tensor fused_sigmoid_gating_delta_rule_update_cpu(
