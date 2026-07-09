@@ -580,7 +580,8 @@ class TestResolvePlatformAutoDiscover(CustomTestCase):
         mock_envs.SGLANG_PLATFORM.get.return_value = ""
         mock_is_cuda_available.return_value = True
         mock_load.return_value = {}
-        result = _resolve_platform()
+        with patch.dict("os.environ", {"SGLANG_USE_CPU_ENGINE": "0"}):
+            result = _resolve_platform()
         self.assertIsInstance(result, CudaSRTPlatform)
 
     @patch("sglang.srt.platforms.load_plugins_by_group")

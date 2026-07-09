@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import sys
 
 try:
     import mooncake
@@ -9,7 +10,13 @@ try:
 except ImportError:
     BENCH_TOOL_PATH = None
     print("Mooncake is not installed.")
-    exit(0)
+    if "pytest" not in sys.modules:
+        exit(0)
+    else:
+        import pytest
+
+        def test_mooncake_transfer_engine_requires_mooncake():
+            pytest.skip("Mooncake is not installed.")
 
 
 def run_cmd(args):

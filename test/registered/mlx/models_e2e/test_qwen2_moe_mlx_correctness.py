@@ -46,11 +46,13 @@ class TestQwen2MoeMlxCorrectness(CustomTestCase):
 
         env = os.environ.copy()
         env["SGLANG_USE_MLX"] = "1"
+        env["SGLANG_USE_CPU_ENGINE"] = "0"
 
         cls.process = popen_launch_server(
             cls.model,
             cls.base_url,
             timeout=DEFAULT_TIMEOUT_FOR_SERVER_LAUNCH,
+            device="mps",
             other_args=[
                 "--trust-remote-code",
                 "--tp-size",
