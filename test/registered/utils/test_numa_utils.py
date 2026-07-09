@@ -298,12 +298,12 @@ class TestNumaBindIntersection(unittest.TestCase):
     def test_node_cpus_no_libnuma_returns_empty(self, _mock_lib):
         self.assertEqual(_node_cpus(0), set())
 
-    @patch("os.sched_getaffinity", return_value=set(range(72)))
+    @patch("os.sched_getaffinity", return_value=set(range(72)), create=True)
     @patch("sglang.srt.utils.numa_utils._node_cpus", return_value=set(range(72)))
     def test_numactl_args_unconstrained_uses_cpunodebind(self, _cpus, _aff):
         self.assertEqual(_numactl_cpu_mem_args(0, 0), "--cpunodebind=0 --membind=0")
 
-    @patch("os.sched_getaffinity", return_value={0} | set(range(21, 144)))
+    @patch("os.sched_getaffinity", return_value={0} | set(range(21, 144)), create=True)
     @patch("sglang.srt.utils.numa_utils._node_cpus", return_value=set(range(72)))
     def test_numactl_args_constrained_uses_physcpubind(self, _cpus, _aff):
         expected_cpus = ",".join(str(c) for c in [0] + list(range(21, 72)))
@@ -313,20 +313,20 @@ class TestNumaBindIntersection(unittest.TestCase):
         )
 
     @patch.dict(os.environ, {"SGLANG_CRASH_ON_NUMA_BIND_FAILURE": "0"})
-    @patch("os.sched_getaffinity", return_value=set(range(72, 144)))
+    @patch("os.sched_getaffinity", return_value=set(range(72, 144)), create=True)
     @patch("sglang.srt.utils.numa_utils._node_cpus", return_value=set(range(72)))
     def test_numactl_args_empty_intersection_returns_none(self, _cpus, _aff):
         self.assertIsNone(_numactl_cpu_mem_args(0, 0))
 
     @patch.dict(os.environ, {"SGLANG_CRASH_ON_NUMA_BIND_FAILURE": "1"})
-    @patch("os.sched_getaffinity", return_value=set(range(72, 144)))
+    @patch("os.sched_getaffinity", return_value=set(range(72, 144)), create=True)
     @patch("sglang.srt.utils.numa_utils._node_cpus", return_value=set(range(72)))
     def test_numactl_args_empty_intersection_crashes_when_enabled(self, _cpus, _aff):
         with self.assertRaises(RuntimeError):
             _numactl_cpu_mem_args(0, 0)
 
-    @patch("os.sched_setaffinity")
-    @patch("os.sched_getaffinity", return_value={0} | set(range(21, 144)))
+    @patch("os.sched_setaffinity", create=True)
+    @patch("os.sched_getaffinity", return_value={0} | set(range(21, 144)), create=True)
     @patch("sglang.srt.utils.numa_utils._node_cpus", return_value=set(range(72)))
     @patch("sglang.srt.utils.numa_utils.get_libnuma")
     def test_numa_bind_to_node_constrained_sets_intersection(
@@ -343,8 +343,8 @@ class TestNumaBindIntersection(unittest.TestCase):
         lib.numa_run_on_node.assert_not_called()
 
     @patch.dict(os.environ, {"SGLANG_CRASH_ON_NUMA_BIND_FAILURE": "0"})
-    @patch("os.sched_setaffinity")
-    @patch("os.sched_getaffinity", return_value=set(range(72, 144)))
+    @patch("os.sched_setaffinity", create=True)
+    @patch("os.sched_getaffinity", return_value=set(range(72, 144)), create=True)
     @patch("sglang.srt.utils.numa_utils._node_cpus", return_value=set(range(72)))
     @patch("sglang.srt.utils.numa_utils.get_libnuma")
     def test_numa_bind_to_node_empty_intersection_skips(

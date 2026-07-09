@@ -541,6 +541,7 @@ class TestGoldenModelOverrides(_IsolatedPublish):
         sa = self._construct(
             "SDARForCausalLM",
             "llama",
+            attention_backend="triton",
             dllm_algorithm="LowConfidence",
             disable_radix_cache=True,
         )

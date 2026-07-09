@@ -217,7 +217,7 @@ class TestSchedulerProfilerManagerMPS(unittest.TestCase):
                 mx.metal,
                 "start_capture",
                 side_effect=RuntimeError("Capture layer is not inserted"),
-            ):
+            ), patch("sglang.srt.hardware_backend.mlx.profiler.use_mlx", return_value=True):
                 result = mgr._start_profile()
 
         self.assertFalse(result.success)
@@ -239,7 +239,9 @@ class TestSchedulerProfilerManagerMPS(unittest.TestCase):
             mgr = self._make_manager(tmp)
             with mock_patch.object(mx.metal, "start_capture"), mock_patch.object(
                 mx.metal, "stop_capture"
-            ), mock_patch("torch.distributed.barrier"):
+            ), mock_patch("torch.distributed.barrier"), mock_patch(
+                "sglang.srt.hardware_backend.mlx.profiler.use_mlx", return_value=True
+            ):
                 result = mgr._start_profile()
                 self.assertTrue(result.success)
                 self.assertTrue(mgr.profile_in_progress)

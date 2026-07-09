@@ -11,7 +11,6 @@ PYPROJECT_PATHS = [
     REPO_ROOT / "python" / "pyproject.toml",
     REPO_ROOT / "python" / "pyproject_cpu.toml",
     REPO_ROOT / "python" / "pyproject_npu.toml",
-    REPO_ROOT / "python" / "pyproject_other.toml",
     REPO_ROOT / "python" / "pyproject_xpu.toml",
     REPO_ROOT / "3rdparty" / "amd" / "wheel" / "sglang" / "pyproject.toml",
 ]

@@ -6,7 +6,20 @@ from unittest.mock import MagicMock, patch
 import torch
 
 from sglang.srt.environ import envs
-from sglang.srt.layers.attention.dsv4.indexer import FP8_DTYPE, C4IndexerBackendMixin
+try:
+    from sglang.srt.layers.attention.dsv4.indexer import (
+        FP8_DTYPE,
+        C4IndexerBackendMixin,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name in {"cutlass", "cutlass.cute"}:
+        FP8_DTYPE = None
+        C4IndexerBackendMixin = None
+        HAS_DSV4_INDEXER = False
+    else:
+        raise
+else:
+    HAS_DSV4_INDEXER = True
 from sglang.srt.layers.attention.dsv4.metadata import NonPagedIndexerPlan
 from sglang.srt.model_executor.forward_batch_info import ForwardMode
 from sglang.srt.runtime_context import get_parallel
@@ -18,6 +31,7 @@ register_cpu_ci(est_time=2, suite="base-a-test-cpu")
 _INDEXER = "sglang.srt.layers.attention.dsv4.indexer"
 
 
+@unittest.skipUnless(HAS_DSV4_INDEXER, "requires cutlass.cute")
 class TestDSV4NonPagedIndexer(CustomTestCase):
     def _is_eligible(self, **overrides):
         backend = SimpleNamespace(hisparse_coordinator=None)

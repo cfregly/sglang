@@ -13,6 +13,8 @@
 # ==============================================================================
 """Common utilities."""
 
+import hashlib
+import sys
 from typing import Any, Callable, List, Optional, Tuple
 
 from sglang.srt.environ import envs
@@ -108,8 +110,38 @@ def get_hash_str(
     prior_hash: Optional[str] = None,
     page_size: Optional[int] = None,
 ) -> str | List[str]:
+    if sys.byteorder != "little" or not sys.platform.startswith("linux"):
+        return _get_python_hash_str(token_ids, prior_hash, page_size)
     prior_digest = bytes.fromhex(prior_hash) if prior_hash else None
     return get_native_hash(token_ids, prior_digest, page_size)
+
+
+def _get_python_hash_str(
+    token_ids: Any,
+    prior_hash: Optional[str] = None,
+    page_size: Optional[int] = None,
+) -> str | List[str]:
+    def hash_page(page_token_ids: Any, page_prior_hash: Optional[str]) -> str:
+        hasher = hashlib.sha256()
+        if page_prior_hash:
+            hasher.update(bytes.fromhex(page_prior_hash))
+        for token_id in page_token_ids:
+            if isinstance(token_id, tuple):
+                for elem in token_id:
+                    hasher.update(elem.to_bytes(4, byteorder="little", signed=False))
+            else:
+                hasher.update(token_id.to_bytes(4, byteorder="little", signed=False))
+        return hasher.hexdigest()
+
+    if page_size is None:
+        return hash_page(token_ids, prior_hash)
+
+    hashes = []
+    running_hash = prior_hash
+    for start in range(0, len(token_ids), page_size):
+        running_hash = hash_page(token_ids[start : start + page_size], running_hash)
+        hashes.append(running_hash)
+    return hashes
 
 
 def hash_str_to_int64(hash_str: str) -> int:

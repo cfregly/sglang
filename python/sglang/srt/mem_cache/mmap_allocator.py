@@ -32,8 +32,8 @@ try:
 except OSError:
     _libc = None
 
-# MAP_POPULATE is in Python's mmap module only since 3.11.
-_MAP_POPULATE = getattr(mmap, "MAP_POPULATE", 0x08000)
+# MAP_POPULATE is Linux-specific; leave it off where Python does not expose it.
+_MAP_POPULATE = getattr(mmap, "MAP_POPULATE", 0)
 # MAP_HUGETLB and MAP_HUGE_* are Linux-specific and not in Python's mmap module.
 _MAP_HUGETLB = 0x40000
 _MAP_HUGE_2MB = 21 << 26  # 0x1400000
@@ -118,10 +118,14 @@ def alloc_mmap(dims: tuple, dtype: torch.dtype) -> torch.Tensor:
     # Plain mmap path -- used directly when no hugepages requested, or as fallback.
     # torch.frombuffer keeps a reference to mm inside the tensor storage, so mm
     # stays alive until the tensor is freed and mmap.mmap.__del__ calls munmap.
-    mm = mmap.mmap(
-        -1,
-        alloc_bytes,
-        flags=mmap.MAP_SHARED | mmap.MAP_ANONYMOUS | _MAP_POPULATE,
-        prot=mmap.PROT_READ | mmap.PROT_WRITE,
-    )
+    try:
+        mm = mmap.mmap(
+            -1,
+            alloc_bytes,
+            flags=mmap.MAP_SHARED | mmap.MAP_ANONYMOUS | _MAP_POPULATE,
+            prot=mmap.PROT_READ | mmap.PROT_WRITE,
+        )
+    except OSError as e:
+        logger.warning("anonymous mmap allocation failed (%s); falling back to torch.empty", e)
+        return torch.empty(dims, dtype=dtype, device="cpu")
     return torch.frombuffer(mm, dtype=dtype, count=math.prod(dims)).reshape(dims)

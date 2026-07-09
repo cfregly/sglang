@@ -17,6 +17,8 @@ from enum import Enum
 
 import torch
 
+_compile_fp4_helper = torch.compile if torch.cuda.is_available() else lambda fn: fn
+
 
 class FP4KVCacheRecipe(Enum):
     MXFP4 = 1  # KVFP4: block-wise scaling
@@ -66,7 +68,7 @@ class BlockFP4KVQuantizeUtil:
     """
 
     @staticmethod
-    @torch.compile
+    @_compile_fp4_helper
     def batched_quantize(tensor: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Quantize tensor to KVFP4 format
@@ -107,7 +109,7 @@ class BlockFP4KVQuantizeUtil:
         return packed, scale_factors
 
     @staticmethod
-    @torch.compile
+    @_compile_fp4_helper
     def batched_dequantize(
         quant_tensor: torch.Tensor,
         scale_factors: torch.Tensor,

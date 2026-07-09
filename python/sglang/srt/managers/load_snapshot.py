@@ -282,7 +282,8 @@ def shm_path_for(ipc_name: str) -> str:
     name = os.path.basename(ipc_name.rstrip("/")) or "default"
     safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
     digest = hashlib.blake2s(ipc_name.encode(), digest_size=4).hexdigest()
-    return f"/dev/shm/sglang_loads_{safe_name}_{digest}.shm"
+    shm_dir = "/dev/shm" if os.path.isdir("/dev/shm") else "/tmp"
+    return f"{shm_dir}/sglang_loads_{safe_name}_{digest}.shm"
 
 
 def file_size(dp_size: int, slot_size: int = SLOT_SIZE) -> int:

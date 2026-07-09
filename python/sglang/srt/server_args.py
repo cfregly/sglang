@@ -4698,15 +4698,17 @@ class ServerArgs:
             logger.warning(
                 "Cuda graph is disabled because of using torch native attention backend"
             )
-            self.cuda_graph_config.decode.backend = Backend.DISABLED
-            self.cuda_graph_config.prefill.backend = Backend.DISABLED
+            if self.cuda_graph_config is not None:
+                self.cuda_graph_config.decode.backend = Backend.DISABLED
+                self.cuda_graph_config.prefill.backend = Backend.DISABLED
 
         if attention_backend == "flex_attention":
             logger.warning(
                 "Cuda graph is disabled because of using torch Flex Attention backend"
             )
-            self.cuda_graph_config.decode.backend = Backend.DISABLED
-            self.cuda_graph_config.prefill.backend = Backend.DISABLED
+            if self.cuda_graph_config is not None:
+                self.cuda_graph_config.decode.backend = Backend.DISABLED
+                self.cuda_graph_config.prefill.backend = Backend.DISABLED
             assert (
                 self.speculative_algorithm is None
             ), "Speculative decoding is currently not supported with Flex Attention backend"

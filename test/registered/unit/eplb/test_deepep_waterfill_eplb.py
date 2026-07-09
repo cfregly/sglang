@@ -13,7 +13,13 @@ from torch import nn
 
 from sglang.srt.layers.moe import topk as topk_module
 from sglang.srt.layers.moe.topk import TopKConfig
-from sglang.srt.models.deepseek_v2 import DeepseekV2MoE
+try:
+    from sglang.srt.models.deepseek_v2 import DeepseekV2MoE
+except ModuleNotFoundError as exc:
+    if exc.name in {"cutlass", "cutlass.cute"}:
+        DeepseekV2MoE = None
+    else:
+        raise
 from sglang.srt.runtime_context import get_parallel
 from sglang.test.test_utils import CustomTestCase
 
@@ -31,6 +37,7 @@ class _FakeExpertParam(nn.Module):
 
 
 class TestDeepEPWaterfillEPLB(CustomTestCase):
+    @unittest.skipUnless(DeepseekV2MoE is not None, "requires cutlass.cute")
     def test_deepseek_moe_get_moe_weights_excludes_fused_shared_slot(self):
         experts = _FakeExpertParam()
         moe = SimpleNamespace(num_fused_shared_experts=1, experts=experts)
@@ -48,6 +55,7 @@ class TestDeepEPWaterfillEPLB(CustomTestCase):
         self.assertTrue(torch.equal(experts.weight.data[-2], torch.zeros(2)))
         self.assertTrue(torch.equal(experts.weight.data[-1], shared_before))
 
+    @unittest.skipUnless(DeepseekV2MoE is not None, "requires cutlass.cute")
     def test_deepseek_moe_get_moe_weights_keeps_full_shape_without_fusion(self):
         experts = _FakeExpertParam()
         moe = SimpleNamespace(num_fused_shared_experts=0, experts=experts)

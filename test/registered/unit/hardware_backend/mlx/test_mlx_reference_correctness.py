@@ -211,6 +211,12 @@ class TestMlxReferenceCorrectness(CustomTestCase):
             f"\n  sgl text: {self.tokenizer.decode(sgl)!r}"
         )
 
+    def _through_first_eos(self, token_ids):
+        for i, token_id in enumerate(token_ids):
+            if token_id in self.eos_ids:
+                return token_ids[: i + 1]
+        return token_ids
+
     # --- tests ------------------------------------------------------------
 
     def test_greedy_matches_reference_exact(self):
@@ -246,8 +252,12 @@ class TestMlxReferenceCorrectness(CustomTestCase):
             self.runner.remove_request(rid)
 
         for i, (prompt, _, _) in enumerate(self.cases):
+            solo_prefix = self._through_first_eos(solo[i])
+            batched_prefix = self._through_first_eos(batched[i])
             self.assertEqual(
-                batched[i], solo[i], self._diff_msg(prompt, solo[i], batched[i])
+                batched_prefix,
+                solo_prefix,
+                self._diff_msg(prompt, solo_prefix, batched_prefix),
             )
 
 

@@ -100,6 +100,7 @@ class TestSSLCertRefresher(CustomTestCase):
             await asyncio.sleep(0.2)
 
             refresher.stop()
+            mock_ctx.reset_mock()
 
             with open(cert_path, "w") as f:
                 f.write("CERT_AFTER_STOP")

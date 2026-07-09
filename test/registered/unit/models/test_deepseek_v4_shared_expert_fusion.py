@@ -1,7 +1,13 @@
 import unittest
 from types import SimpleNamespace
 
-from sglang.srt.models.deepseek_v4 import DeepseekV4ForCausalLM
+try:
+    from sglang.srt.models.deepseek_v4 import DeepseekV4ForCausalLM
+except ModuleNotFoundError as exc:
+    if exc.name in {"cutlass", "cutlass.cute"}:
+        DeepseekV4ForCausalLM = None
+    else:
+        raise
 from sglang.srt.runtime_context import get_context, reset_context
 from sglang.srt.server_args import ServerArgs
 from sglang.test.ci.ci_register import register_cpu_ci
@@ -9,6 +15,7 @@ from sglang.test.ci.ci_register import register_cpu_ci
 register_cpu_ci(est_time=4, suite="base-a-test-cpu")
 
 
+@unittest.skipUnless(DeepseekV4ForCausalLM is not None, "requires cutlass.cute")
 class TestDeepseekV4SharedExpertFusionPolicy(unittest.TestCase):
     """The disable decision is a load-time resolution: it writes through to
     the published config via declare_load_time_override."""
