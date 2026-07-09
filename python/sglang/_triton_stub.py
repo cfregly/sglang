@@ -105,6 +105,11 @@ def _next_power_of_2(n: int) -> int:
     return 1 << (n - 1).bit_length() if n > 0 else 1
 
 
+def _triton_key() -> str:
+    """Stable cache key used by PyTorch Inductor's Triton compatibility probe."""
+    return "sglang-triton-stub"
+
+
 class _Config:
     """Minimal stand-in for ``triton.Config`` used in ``@triton.autotune``."""
 
@@ -211,9 +216,30 @@ def install() -> None:
     driver = _make_mock("triton.runtime.driver")
     runtime.driver = driver
 
+    # triton.runtime.cache  (used by torch._inductor.runtime.triton_compat)
+    cache = types.ModuleType("triton.runtime.cache")
+    cache.__package__ = "triton.runtime"
+    cache.__file__ = __file__
+    cache.triton_key = _triton_key
+    sys.modules["triton.runtime.cache"] = cache
+    runtime.cache = cache
+
     # triton.testing
     testing = _make_mock("triton.testing")
     triton.testing = testing
+
+    # triton.compiler / triton.compiler.compiler  (used by torch._inductor)
+    compiler_pkg = _make_mock("triton.compiler")
+    triton.compiler = compiler_pkg
+    compiler_compiler = types.ModuleType("triton.compiler.compiler")
+    compiler_compiler.__package__ = "triton.compiler"
+    compiler_compiler.__file__ = __file__
+    compiler_compiler.triton_key = _triton_key
+    compiler_compiler.ASTSource = type(
+        "ASTSource", (_StubBase,), {"__module__": "triton.compiler.compiler"}
+    )
+    sys.modules["triton.compiler.compiler"] = compiler_compiler
+    compiler_pkg.compiler = compiler_compiler
 
     # triton.tools / triton.tools.tensor_descriptor
     tools = _make_mock("triton.tools")

@@ -3,6 +3,14 @@
 
 namespace {
 
+template <typename T>
+inline bool topk_pair_greater(const T& x, const T& y) {
+  if (x.first == y.first) {
+    return x.second < y.second;
+  }
+  return x.first > y.first;
+}
+
 template <typename scalar_t, int SIZE>
 inline void softmax(float* __restrict__ out, const scalar_t* __restrict__ input) {
   using bVec = at::vec::Vectorized<scalar_t>;
@@ -98,10 +106,7 @@ void grouped_topk_kernel_impl(
       }
 
       // find group topk
-      std::partial_sort(
-          queue.begin(), queue.begin() + topk_group, queue.end(), [](const elem_t& x, const elem_t& y) -> bool {
-            return x.first > y.first;
-          });
+      std::partial_sort(queue.begin(), queue.begin() + topk_group, queue.end(), topk_pair_greater<elem_t>);
 
       for (int64_t g = 0; g < topk_group; ++g) {
         int32_t group_idx = queue[g].second;
@@ -112,10 +117,7 @@ void grouped_topk_kernel_impl(
       }
 
       // find global topk
-      std::partial_sort(
-          queue2.begin(), queue2.begin() + topk, queue2.end(), [](const elem_t& x, const elem_t& y) -> bool {
-            return x.first > y.first;
-          });
+      std::partial_sort(queue2.begin(), queue2.begin() + topk, queue2.end(), topk_pair_greater<elem_t>);
 
       for (int64_t j = 0; j < topk; ++j) {
         topk_weights[i * topk + j] = queue2[j].first;
@@ -239,9 +241,7 @@ void topk_softmax_kernel_impl(
         queue[e] = {scores[e], e};
       }
 
-      std::partial_sort(queue.begin(), queue.begin() + topk, queue.end(), [](const elem_t& x, const elem_t& y) -> bool {
-        return x.first > y.first;
-      });
+      std::partial_sort(queue.begin(), queue.begin() + topk, queue.end(), topk_pair_greater<elem_t>);
 
       for (int64_t j = 0; j < topk; ++j) {
         topk_weights[i * topk + j] = queue[j].first;
@@ -342,10 +342,7 @@ void biased_grouped_topk_kernel_impl(
       }
 
       // find group topk
-      std::partial_sort(
-          queue.begin(), queue.begin() + topk_group, queue.end(), [](const elem_t& x, const elem_t& y) -> bool {
-            return x.first > y.first;
-          });
+      std::partial_sort(queue.begin(), queue.begin() + topk_group, queue.end(), topk_pair_greater<elem_t>);
 
       for (int64_t g = 0; g < topk_group; ++g) {
         int32_t group_idx = queue[g].second;
@@ -356,10 +353,7 @@ void biased_grouped_topk_kernel_impl(
       }
 
       // find global topk
-      std::partial_sort(
-          queue2.begin(), queue2.begin() + TOPK, queue2.end(), [](const elem_t& x, const elem_t& y) -> bool {
-            return x.first > y.first;
-          });
+      std::partial_sort(queue2.begin(), queue2.begin() + TOPK, queue2.end(), topk_pair_greater<elem_t>);
 
       for (int j = 0; j < TOPK; ++j) {
         int32_t index = queue2[j].second;

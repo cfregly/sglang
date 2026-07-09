@@ -217,10 +217,11 @@ class TestROPE(CustomTestCase):
                 rope_ref.cos_sin_cache.to(query.dtype),
                 rope_ref.is_neox_style,
             )
+            atol = rtol = 2 * precision[query_ref_out.dtype]
             torch.testing.assert_close(
-                query_ref_out, query_cpu_out, atol=1e-2, rtol=1e-2
+                query_ref_out, query_cpu_out, atol=atol, rtol=rtol
             )
-            torch.testing.assert_close(key_ref_out, key_cpu_out, atol=1e-2, rtol=1e-2)
+            torch.testing.assert_close(key_ref_out, key_cpu_out, atol=atol, rtol=rtol)
 
         test_config = [
             (64, 64, 32, 8000, True, torch.bfloat16, "cpu", 32, 32, 1, 1),
